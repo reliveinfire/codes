@@ -1,0 +1,98 @@
+#include <iostream>
+#include <string>
+#include <map>
+#include <vector>
+#include <limits.h>
+#include <queue>
+#include <stack>
+#include <sstream>
+#include <algorithm>
+
+using namespace std;
+class Dtree{
+	public:
+	int isLeaf;
+	Dtree* child[26];
+	Dtree() {
+		isLeaf = 0;
+		for (int i = 0 ; i < 26 ; i++)
+			child[i] = NULL;
+	}
+};
+class Solution {
+	public:
+	map<string, int> dic;
+	vector<string> findAllConcatenatedWordsInADict(vector<string>& words){
+		vector<string> result;
+		Dtree* root = new Dtree();
+		for (int i = 0 ; i < words.size() ; i++){
+			Dtree* idx = root;
+			string st = words[i];
+			cout << st << endl;
+			dic[st] = 1;
+			for (int j = 0 ; j < st.size() ; j++){
+				cout << "add:" << st[j] << endl;
+				if (idx->child[st[j] - 'a'] == NULL) {
+					cout << "add new node!!!\n";
+					idx->child[st[j] - 'a'] = new Dtree();
+				}
+				idx = idx->child[st[j] - 'a'];
+			}
+			idx->isLeaf = 1;	
+		}
+#if 0
+		for (int i = 0 ; i < words.size() ; i++){
+			string st = words[i];
+			if (concatenate(st, root))
+				result.push_back(st);
+		}
+#endif
+		if (ccc("catsdogcats", 0, root, 0))
+				result.push_back("catsdogcats");
+		return result;
+	}
+	bool ccc(string s, int start, Dtree* root, int rerun){
+		Dtree* idx = root;
+		int ret;
+		if (rerun){
+			string sub = s.substr(start, s.size() - start);
+			cout << "sub:" << sub << endl;
+			if (dic.find(sub))
+				return true;
+		}
+		for (int i = start ; i < s.size() ; i++){
+			if (idx->isLeaf){
+				ret = ccc(s, i, root, 1);
+				if (ret)
+					return true;
+			}
+			if (idx->child[s[i] - 'a'])
+				idx = idx->child[s[i] - 'a'];
+			else
+				return false;
+		}
+		return false;
+	}
+};
+
+#define genVector(data, array) vector<int> data(array, array+sizeof(array)/sizeof(array[0]));
+int main()
+{
+	vector<string> ret_vec;
+	vector<string> words;
+	words.push_back("cat");
+	words.push_back("cats");
+	words.push_back("catsdogcats");
+	words.push_back("dog");
+	//words.push_back("dogcatsdog");
+	//words.push_back("rat");
+	//words.push_back("ratcatdogcat");
+	Solution sol;
+	ret_vec = sol.findAllConcatenatedWordsInADict(words);
+
+	for (int i = 0 ; i < ret_vec.size() ; i++)
+		cout << ret_vec[i] << " ";
+	cout <<endl;
+
+	return 0;
+}
