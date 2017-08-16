@@ -22,7 +22,37 @@ struct TreeNode {
 class Solution {
 	public:
 	vector<int> diffWaysToCompute(string input){
-		
+			return compute(input, 0, input.size() - 1);
+	}
+
+	vector<int> compute(string str, int ss, int ee){
+		vector<int> ans;
+		bool found = false;
+		for (int i = ss ; i <= ee ; i++){
+			if (str[i] == '+' || str[i]=='-' || str[i]=='*'){
+				found = true;
+				vector<int> left = compute(str, ss, i-1);
+				vector<int> right = compute(str, i+1, ee);
+				for (int l = 0 ; l < left.size() ; l++){
+					for (int r = 0 ; r < right.size() ; r++){
+						int tmp;
+						if (str[i]=='+')
+							tmp = left[l] + right[r];
+						else if (str[i] == '-')
+							tmp = left[l] - right[r];
+						else if (str[i]=='*')
+							tmp = left[l] * right[r];
+						ans.push_back(tmp);
+						cout << left[l] <<":" <<right[r] <<"="<< tmp << endl;
+					}
+				}
+			}
+		}
+		if (!found){
+			str = str.substr(ss, ee - ss + 1);
+			return {stoi(str)};
+		}
+		return ans;
 	}
 };
 
@@ -34,8 +64,7 @@ int main()
 	Solution sol;
 	vector<int> ret_vec;
 	int ret;
-	ret = sol.
-	ret_vec = sol.
+	ret_vec = sol.diffWaysToCompute("2*3-4*5");
 	cout << ret << "\n";
 
 	for (int i = 0 ; i < ret_vec.size() ; i++)

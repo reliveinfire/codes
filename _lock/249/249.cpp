@@ -29,7 +29,7 @@ class Solution {
 				int diff = ss[i] - ss[i-1];
 				if (diff < 0)
 					diff += 26;
-				num += to_string(diff);
+				num += to_string(diff) + string(",");
 			}
 			table[num].push_back(ss);
 		}
