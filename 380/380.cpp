@@ -1,0 +1,199 @@
+#include "../helpers.cpp"
+#ifdef I2C
+static void i2c_flush_rxfifo(struct i2c_adapter *adap)
+{
+        struct i2c_regs *i2c_base = i2c_get_base(adap);
+        while (readl(&i2c_base->ic_status) & IC_STATUS_RFNE) {
+                readl(&i2c_base->ic_cmd_data);
+                //debug("flush rxfifo: read data %02x\n", data);
+        }
+}
+static int i2c_wait_for_bb(struct i2c_adapter *adap)
+{
+        struct i2c_regs *i2c_base = i2c_get_base(adap);
+        int count = 0;
+
+        //debug("wait for BB: ic status %08x\n", readl(&i2c_base->ic_status));
+        while ((readl(&i2c_base->ic_status) & IC_STATUS_MA) ||
+               !(readl(&i2c_base->ic_status) & IC_STATUS_TFE)) {
+                /* Evaluate timeout */
+                udelay(1000);
+                count++;
+                if (count > TIMEOUT_LOOP)
+                        return 3;
+        }
+
+        return 0;
+}
+static int i2c_xfer_init(struct i2c_adapter *adap, uchar chip, uint addr,
+                         int alen)
+{
+        struct i2c_regs *i2c_base = i2c_get_base(adap);
+
+        int ret = i2c_wait_for_bb(adap);
+        if (ret){
+                return ret;
+        }
+
+        i2c_setaddress(adap, chip);
+        while (alen) {
+                alen--;
+                /* high byte address going out first */
+                writel((addr >> (alen * 8)) & 0xff,
+                       &i2c_base->ic_cmd_data);
+        }
+static int i2c_xfer_finish(struct i2c_adapter *adap)
+{
+        struct i2c_regs *i2c_base = i2c_get_base(adap);
+
+        int count = 0;
+        while (1) {
+                if ((readl(&i2c_base->ic_raw_intr_stat) & IC_STOP_DET)) {
+                        readl(&i2c_base->ic_clr_stop_det);
+                        break;
+                } else if (count > TIMEOUT_LOOP){
+                        break;
+                } else {
+                        udelay(1000);
+                        count++;
+                }
+        }
+
+        if (i2c_wait_for_bb(adap)) {
+                return 5;
+        }
+
+        i2c_flush_rxfifo(adap);
+
+        return 0;
+}
+
+static int dw_i2c_read(struct i2c_adapter *adap, u8 dev, uint addr,
+                       int alen, u8 *buffer, int len)
+{
+        struct i2c_regs *i2c_base = i2c_get_base(adap);
+        int count = 0;
+        int ret = i2c_xfer_init(adap, dev, addr, alen);
+        if (ret){
+                return ret;
+        }
+
+        if (len == 1)
+                writel(IC_CMD | IC_STOP, &i2c_base->ic_cmd_data);
+        else if (len > 0)
+                writel(IC_CMD, &i2c_base->ic_cmd_data);
+
+        while (len) {
+                if ((readl(&i2c_base->ic_status) & IC_STATUS_RFNE) != 0) {
+                        *buffer++ = (uchar)readl(&i2c_base->ic_cmd_data);
+                        len--;
+                        if (len == 1)
+                                writel(IC_CMD | IC_STOP, &i2c_base->ic_cmd_data);
+                        else if (len > 0)
+                                writel(IC_CMD, &i2c_base->ic_cmd_data);
+                } else if (count > TIMEOUT_LOOP){
+                        return 7;
+                } else {
+                        count++;
+                        // 4bytes + address, start/stop bit, take it as 8 bytes
+                        // 8 bytes = 256 bits
+                        udelay(5000);
+                }
+        }
+
+        return i2c_xfer_finish(adap);
+}
+int giu_i2c_read(unsigned int reg)
+{
+        unsigned int val;
+        dw_i2c_read(NULL, GIU_SLAVE_ADDR, reg, 1, (u8*)&val, 4);
+        val = (val &0x00FFFF00) | (val &0xFF) << 24 | (val &0xFF000000) >> 24;
+        val = (val &0xFF0000FF) | (val &0xFF00) << 8 | (val&0xFF0000) >> 8;
+        return val;
+}
+
+int giu_i2c_write(unsigned int reg, unsigned int val){
+        int ret = 0;
+        val = (val &0x00FFFF00) | (val &0xFF) << 24 | (val &0xFF000000) >> 24;
+        val = (val &0xFF0000FF) | (val &0xFF00) << 8 | (val&0xFF0000) >> 8;
+        ret = dw_i2c_write(NULL, GIU_SLAVE_ADDR, reg, 1, (uint8_t*)&val, 4);
+        return ret;
+}
+
+#else
+
+vector<int> preOrder = {100,50, 40, 80, 60, 200, 150, 180, 250};
+class RandomizedSet {
+public:
+    /** Initialize your data structure here. */
+    RandomizedSet() {
+
+    }
+
+    /** Inserts a value to the set. Returns true if the set did not already contain the specified element. */
+    bool insert(int val) {
+    	auto iter = tb.find(val);
+	if (iter!=tb.end())
+		return false;
+	int sz = tb.size();
+	tb[val] = sz;
+	vec.push_back(val);
+	return true;
+    }
+
+    /** Removes a value from the set. Returns true if the set contained the specified element. */
+    bool remove(int val) {
+    	auto iter = tb.find(val);
+	if (iter==tb.end())
+		return false;
+	int pos = iter->second;
+	int tmp = vec.back();
+	vec[vec.size() - 1] = vec[pos];
+	vec[pos] = tmp;
+//	cout << "erase:" << iter->first << endl;
+//	cout << "tmp=" << tmp << endl;
+#if 0
+	// why?? 找到問題了, 因為iter本來就要erase, 若是同一個!會出問題. 因為又被加回來.
+	tb.erase(iter);
+	tb[tmp] = pos;
+#else
+	tb[tmp] = pos;
+	tb.erase(iter);
+#endif
+	vec.pop_back();
+	return true;
+    }
+
+    /** Get a random element from the set. */
+    int getRandom() {
+    	random_device rd;
+	mt19937 gen(rd());
+	uniform_int_distribution<int> dis(0, vec.size() - 1);
+	int ret = dis(gen);
+	return vec[ret];
+    }
+private:
+	unordered_map<int,int> tb; // key / pos
+	vector<int> vec;
+};
+#endif
+#define genVector(data, array) vector<int> data(array, array+sizeof(array)/sizeof(array[0]));
+int main()
+{
+	vector<int> A = {1,2,3};
+	vector<int> B = {1,2,3};
+	string tre("1,#,3,2,#,#,4,#,5,#,#");
+	Codec cc;
+	//TreeNode* node = cc.deserialize(tre);
+	//cout <<  cc.serialize(node) << endl;
+	RandomizedSet rr;
+	
+	cout  << "ans:" << rr.insert(0) << endl;
+	cout << "ans:" << rr.remove(0) << endl;
+	cout  << "ans:" << rr.insert(-1) << endl;
+	cout << "ans:" << rr.remove(0) << endl;
+	rr.getRandom();
+
+
+	return 0;
+}
