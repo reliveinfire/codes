@@ -12,6 +12,7 @@
 #include <map>
 #include <tuple>
 #include <random>
+#include <list>
 using namespace std;
 struct TreeNode {
         int val;
